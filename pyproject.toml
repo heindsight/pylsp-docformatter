@@ -30,7 +30,16 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
+    "black",
+    "flake8",
+    "flake8-pytest-style",
+    "isort",
+    "mypy",
+    "pdbpp",
     "pytest",
+    "pytest-cov",
+    "pytest-icdiff",
+    "pytest-randomly",
 ]
 
 [project.license]
@@ -41,3 +50,11 @@ Homepage = "https://github.com/heindsight/pylsp-docformatter"
 
 [project.entry-points.pylsp]
 pylsp_docformatter = "pylsp_docformatter.plugin"
+
+[[tool.mypy.overrides]]
+module = "pylsp.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "docformatter.*"
+ignore_missing_imports = true
