@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools >= 68.2.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pylsp-docformatter"
+authors = [
+    {name = "Heinrich Kruger", email = "heindsight@kruger.dev"},
+]
+readme = "README.md"
+version = "0.0.1"
+description = "Docformatter plugin for the Python LSP Server."
+keywords = [
+    "PEP 257", "pep257", "style", "formatter", "docstrings", "pylsp",
+]
+classifiers = [
+    "Programming Language :: Python",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Text Editors :: Integrated Development Environments (IDE)",
+    "Topic :: Software Development",
+    "License :: OSI Approved :: BSD License",
+]
+requires-python = "~=3.8"
+dependencies = [
+    "docformatter",
+    "python-lsp-server"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+[project.license]
+file = "LICENSE"
+
+[project.urls]
+Homepage = "https://github.com/heindsight/pylsp-docformatter"
+
+[project.entry-points.pylsp]
+pylsp_docformatter = "pylsp_docformatter.plugin"
