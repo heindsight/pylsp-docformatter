@@ -8,7 +8,7 @@ from pylsp import hookimpl
 from pylsp.config.config import Config
 from pylsp.workspace import Document, Workspace
 
-from .types import FormatResult, Range
+from .types import FormatResult, LspSettings, Range
 from .util import temp_work_dir
 
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @hookimpl
-def pylsp_settings():
+def pylsp_settings() -> LspSettings:
     logger.info("Initializing pylsp_docformatter")
 
     return {

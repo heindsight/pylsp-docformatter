@@ -1,4 +1,6 @@
+from pathlib import Path
 from textwrap import dedent
+from typing import List
 from unittest.mock import Mock
 
 import pytest
@@ -10,38 +12,38 @@ from pylsp_docformatter import plugin
 
 
 @pytest.fixture
-def root_path(tmp_path):
+def root_path(tmp_path: Path) -> Path:
     pth = tmp_path / "project_root"
     pth.mkdir()
     return pth
 
 
 @pytest.fixture
-def src_path(root_path):
+def src_path(root_path: Path) -> Path:
     pth = root_path / "src"
     pth.mkdir()
     return pth
 
 
 @pytest.fixture
-def root_uri(root_path):
+def root_uri(root_path: Path) -> str:
     return uris.from_fs_path(str(root_path))
 
 
 @pytest.fixture
-def config(root_uri):
+def config(root_uri: str) -> Config:
     """Return a config object."""
     return Config(root_uri, {}, 0, {})
 
 
 @pytest.fixture
-def workspace(root_uri, config):
+def workspace(root_uri: str, config: Config) -> Workspace:
     """Return a workspace."""
     return Workspace(root_uri, Mock(), config)
 
 
 @pytest.fixture
-def doc_lines():
+def doc_lines() -> List[str]:
     return [
         '"""Simple example for testing."""',
         "",
@@ -53,17 +55,17 @@ def doc_lines():
 
 
 @pytest.fixture
-def newline():
+def newline() -> str:
     return "\n"
 
 
 @pytest.fixture
-def doc_content(doc_lines, newline):
+def doc_content(doc_lines: List[str], newline: str) -> str:
     return newline.join(doc_lines)
 
 
 @pytest.fixture
-def document(workspace, src_path, doc_content):
+def document(workspace: Workspace, src_path: Path, doc_content: str) -> Document:
     dest_path = src_path / "example.py"
     dest_path.write_text(doc_content)
     document_uri = uris.from_fs_path(str(dest_path))
@@ -72,7 +74,7 @@ def document(workspace, src_path, doc_content):
 
 class TestLoadDocformatConfig:
     @pytest.fixture
-    def pyproject_toml(self, root_path):
+    def pyproject_toml(self, root_path: Path) -> Path:
         config = """\
             [tool.docformatter]
             black = true
@@ -83,7 +85,7 @@ class TestLoadDocformatConfig:
         return pth
 
     @pytest.fixture
-    def config_file(self, tmp_path):
+    def config_file(self, tmp_path: Path) -> Path:
         config = """\
             [docformatter]
             wrap-summaries = 42
@@ -92,12 +94,20 @@ class TestLoadDocformatConfig:
         pth.write_text(dedent(config))
         return pth
 
-    def test_default_plugin_settings(self, pyproject_toml, config, workspace):
+    @pytest.mark.usefixtures("pyproject_toml")
+    def test_default_plugin_settings(
+        self, config: Config, workspace: Workspace
+    ) -> None:
         configurater = plugin.load_docformat_config(config, workspace)
 
         assert configurater.args.black
 
-    def test_with_config_file(self, config_file, config, workspace):
+    def test_with_config_file(
+        self,
+        config: Config,
+        workspace: Workspace,
+        config_file: Path,
+    ) -> None:
         config._plugin_settings = {
             "plugins": {
                 "docformatter": {
@@ -112,7 +122,13 @@ class TestLoadDocformatConfig:
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
-def test_formats_document(config, workspace, newline, document, doc_content):
+def test_formats_document(
+    config: Config,
+    workspace: Workspace,
+    newline: str,
+    document: Document,
+    doc_content: str,
+) -> None:
     result = plugin.pylsp_format_document(
         config=config, workspace=workspace, document=document
     )
@@ -129,11 +145,11 @@ def test_formats_document(config, workspace, newline, document, doc_content):
 
 
 def test_formats_range(
-    config,
-    workspace,
-    document,
-    doc_content,
-):
+    config: Config,
+    workspace: Workspace,
+    document: Document,
+    doc_content: str,
+) -> None:
     result = plugin.pylsp_format_range(
         config=config,
         workspace=workspace,

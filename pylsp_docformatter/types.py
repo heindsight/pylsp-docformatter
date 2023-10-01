@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import Any, Dict, TypedDict
 
 
 class RangeBoundary(TypedDict):
@@ -14,3 +14,6 @@ class Range(TypedDict):
 class FormatResult(TypedDict):
     range: Range
     newText: str
+
+
+LspSettings = Dict[str, Any]
