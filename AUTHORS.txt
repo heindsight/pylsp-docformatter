@@ -1,0 +1,14 @@
+=======
+Credits
+=======
+
+Development Lead
+----------------
+
+* Heinrich Kruger <heindsight@kruger.dev>
+
+Contributors
+------------
+
+None yet. Why not be the first?
+
