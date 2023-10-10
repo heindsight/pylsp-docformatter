@@ -94,11 +94,49 @@ class TestLoadDocformatConfig:
         pth.write_text(dedent(config))
         return pth
 
+    @pytest.fixture
+    def same_workspace_doc(self, workspace: Workspace, src_path: Path) -> Document:
+        text = "print('hello')\n"
+        dest_path = src_path / "example_2.py"
+        dest_path.write_text(text)
+        document_uri = uris.from_fs_path(str(dest_path))
+        return Document(document_uri, workspace, source=text)
+
+    @pytest.fixture
+    def other_project_root(self, tmp_path: Path) -> Path:
+        pth = tmp_path / "other_project"
+        pth.mkdir()
+        return pth
+
+    @pytest.fixture
+    def other_config(self, other_project_root: Path) -> Config:
+        root_uri = uris.from_fs_path(str(other_project_root))
+        return Config(root_uri, {}, 0, {})
+
+    @pytest.fixture
+    def other_workspace(
+        self, other_project_root: Path, other_config: Config
+    ) -> Workspace:
+        root_uri = uris.from_fs_path(str(other_project_root))
+        return Workspace(root_uri, Mock(), other_config)
+
+    @pytest.fixture
+    def other_workspace_doc(
+        self, other_project_root: Path, other_workspace: Workspace
+    ) -> Document:
+        text = "print('hello')\n"
+
+        doc_path = other_project_root / "example.py"
+        doc_path.write_text(text)
+        document_uri = uris.from_fs_path(str(doc_path))
+
+        return Document(document_uri, other_workspace, source=text)
+
     @pytest.mark.usefixtures("pyproject_toml")
     def test_default_plugin_settings(
-        self, config: Config, workspace: Workspace
+        self, config: Config, workspace: Workspace, document: Document
     ) -> None:
-        configurater = plugin.load_docformat_config(config, workspace)
+        configurater = plugin.load_docformat_config(workspace, config, document)
 
         assert configurater.args.black
 
@@ -107,18 +145,61 @@ class TestLoadDocformatConfig:
         config: Config,
         workspace: Workspace,
         config_file: Path,
+        document: Document,
     ) -> None:
         config._plugin_settings = {
             "plugins": {
-                "docformatter": {
+                "pylsp_docformatter": {
                     "enabled": True,
                     "config_file": str(config_file),
                 }
             }
         }
-        configurater = plugin.load_docformat_config(config, workspace)
+        configurater = plugin.load_docformat_config(workspace, config, document)
 
         assert configurater.args.wrap_summaries == 42
+
+    def test_caches_config_same_workspace_root(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        same_workspace_doc: Document,
+    ):
+        plugin._load_docformat_config.cache_clear()
+
+        configurater1 = plugin.load_docformat_config(workspace, config, document)
+        configurater2 = plugin.load_docformat_config(
+            workspace, config, same_workspace_doc
+        )
+
+        assert configurater1 is configurater2
+
+        cache_info = plugin._load_docformat_config.cache_info()
+        assert cache_info.misses == 1
+        assert cache_info.hits == 1
+
+    def test_other_workspace_root_not_cached(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        other_config: Config,
+        other_workspace: Workspace,
+        other_workspace_doc: Document,
+    ):
+        plugin._load_docformat_config.cache_clear()
+
+        configurater1 = plugin.load_docformat_config(workspace, config, document)
+        configurater2 = plugin.load_docformat_config(
+            other_workspace, other_config, other_workspace_doc
+        )
+
+        assert configurater1 is not configurater2
+
+        cache_info = plugin._load_docformat_config.cache_info()
+        assert cache_info.misses == 2
+        assert cache_info.hits == 0
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])

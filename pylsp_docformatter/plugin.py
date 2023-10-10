@@ -1,6 +1,7 @@
 import io
 import logging
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional
 
 import docformatter
@@ -21,7 +22,7 @@ def pylsp_settings() -> LspSettings:
 
     return {
         "plugins": {
-            "docformatter": {
+            "pylsp_docformatter": {
                 "enabled": True,
             }
         }
@@ -32,7 +33,7 @@ def pylsp_settings() -> LspSettings:
 def pylsp_format_document(
     config: Config, workspace: Workspace, document: Document
 ) -> List[FormatResult]:
-    docformat_config = load_docformat_config(config, workspace)
+    docformat_config = load_docformat_config(workspace, config, document)
     return do_format(docformat_config, document)
 
 
@@ -40,7 +41,7 @@ def pylsp_format_document(
 def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
 ) -> List[FormatResult]:
-    docformat_config = load_docformat_config(config, workspace)
+    docformat_config = load_docformat_config(workspace, config, document)
     range["start"]["character"] = 0
     range["end"]["line"] += 1
     range["end"]["character"] = 0
@@ -76,20 +77,28 @@ def do_format(
     return [{"range": range, "newText": formatted_text}]
 
 
-@lru_cache
 def load_docformat_config(
-    config: Config, workspace: Workspace
+    workspace: Workspace, config: Config, document: Document
 ) -> docformatter.Configurater:
-    plugin_settings = config.plugin_settings("docformatter")
+    plugin_settings = config.plugin_settings(
+        "pylsp_docformatter", document_path=document.path
+    )
     config_file = plugin_settings.get("config_file")
 
+    return _load_docformat_config(workspace.root_path, config_file)
+
+@lru_cache
+def _load_docformat_config(
+    workspace_root: Path, config_file: Optional[str]
+) -> docformatter.Configurater:
     args = ["docformatter"]
+
     if config_file:
         args.extend(["--config", config_file])
 
     args.append("-")
 
-    with temp_work_dir(workspace.root_path):
+    with temp_work_dir(workspace_root):
         configurater = docformatter.Configurater(args)
         configurater.do_parse_arguments()
 
