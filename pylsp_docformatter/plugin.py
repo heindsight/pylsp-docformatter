@@ -1,3 +1,4 @@
+"""PyLSP plugin to format docstrings using docformatter."""
 import io
 import logging
 from functools import lru_cache
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 @hookimpl
 def pylsp_settings() -> LspSettings:
+    """Get default plugin settings."""
     logger.info("Initializing pylsp_docformatter")
 
     return {
@@ -33,21 +35,23 @@ def pylsp_settings() -> LspSettings:
 def pylsp_format_document(
     config: Config, workspace: Workspace, document: Document
 ) -> List[FormatResult]:
+    """Format an entire document."""
     docformat_config = load_docformat_config(workspace, config, document)
-    return do_format(docformat_config, document)
+    return _do_format(docformat_config, document)
 
 
 @hookimpl(trylast=True)
 def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
 ) -> List[FormatResult]:
+    """Format a range of lines."""
     docformat_config = load_docformat_config(workspace, config, document)
     range["start"]["character"] = 0
     range["end"]["character"] = 0
-    return do_format(docformat_config, document, range)
+    return _do_format(docformat_config, document, range)
 
 
-def do_format(
+def _do_format(
     config: docformatter.Configurater, document: Document, range: Optional[Range] = None
 ) -> List[FormatResult]:
     if range:
@@ -79,6 +83,7 @@ def do_format(
 def load_docformat_config(
     workspace: Workspace, config: Config, document: Document
 ) -> docformatter.Configurater:
+    """Load docformatter configuration for an LSP workspace."""
     plugin_settings = config.plugin_settings(
         "pylsp_docformatter", document_path=document.path
     )
@@ -86,10 +91,12 @@ def load_docformat_config(
 
     return _load_docformat_config(workspace.root_path, config_file)
 
+
 @lru_cache
 def _load_docformat_config(
     workspace_root: Path, config_file: Optional[str]
 ) -> docformatter.Configurater:
+    """Load docformatter config from the workspace root directory."""
     args = ["docformatter"]
 
     if config_file:

@@ -31,11 +31,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black",
+    "docformatter",
     "flake8",
     "flake8-pytest-style",
     "isort",
     "mypy",
     "pdbpp",
+    "pydocstyle",
     "pytest",
     "pytest-cov",
     "pytest-icdiff",
@@ -58,3 +60,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "docformatter.*"
 ignore_missing_imports = true
+
+[tool.docformatter]
+black = true
