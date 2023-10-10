@@ -43,7 +43,6 @@ def pylsp_format_range(
 ) -> List[FormatResult]:
     docformat_config = load_docformat_config(workspace, config, document)
     range["start"]["character"] = 0
-    range["end"]["line"] += 1
     range["end"]["character"] = 0
     return do_format(docformat_config, document, range)
 

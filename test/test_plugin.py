@@ -1,6 +1,5 @@
 from pathlib import Path
 from textwrap import dedent
-from typing import List
 from unittest.mock import Mock
 
 import pytest
@@ -43,31 +42,31 @@ def workspace(root_uri: str, config: Config) -> Workspace:
 
 
 @pytest.fixture
-def doc_lines() -> List[str]:
-    return [
-        '"""Simple example for testing."""',
-        "",
-        "",
-        "def main():",
-        '    print("Hello World!")',
-        "",
-    ]
-
-
-@pytest.fixture
 def newline() -> str:
     return "\n"
 
 
 @pytest.fixture
-def doc_content(doc_lines: List[str], newline: str) -> str:
-    return newline.join(doc_lines)
+def doc_content(newline: str) -> str:
+    content = dedent(
+        '''\
+        """Simple example for testing
+
+        Test the docformatter pylsp plugin"""
+
+        def main():
+            print("Hello World!")
+        '''
+    )
+    return content.replace("\n", newline)
 
 
 @pytest.fixture
-def document(workspace: Workspace, src_path: Path, doc_content: str) -> Document:
+def document(
+    workspace: Workspace, src_path: Path, doc_content: str, newline: str
+) -> Document:
     dest_path = src_path / "example.py"
-    dest_path.write_text(doc_content)
+    dest_path.write_text(doc_content, newline=newline)
     document_uri = uris.from_fs_path(str(dest_path))
     return Document(document_uri, workspace, source=doc_content)
 
@@ -75,23 +74,27 @@ def document(workspace: Workspace, src_path: Path, doc_content: str) -> Document
 class TestLoadDocformatConfig:
     @pytest.fixture
     def pyproject_toml(self, root_path: Path) -> Path:
-        config = """\
+        config = dedent(
+            """\
             [tool.docformatter]
             black = true
             """
+        )
 
         pth = root_path / "pyproject.toml"
-        pth.write_text(dedent(config))
+        pth.write_text(config)
         return pth
 
     @pytest.fixture
     def config_file(self, tmp_path: Path) -> Path:
-        config = """\
+        config = dedent(
+            """\
             [docformatter]
             wrap-summaries = 42
             """
+        )
         pth = tmp_path / "setup.cfg"
-        pth.write_text(dedent(config))
+        pth.write_text(config)
         return pth
 
     @pytest.fixture
@@ -203,50 +206,75 @@ class TestLoadDocformatConfig:
 
 
 @pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
-def test_formats_document(
-    config: Config,
-    workspace: Workspace,
-    newline: str,
-    document: Document,
-    doc_content: str,
-) -> None:
-    result = plugin.pylsp_format_document(
-        config=config, workspace=workspace, document=document
-    )
+class TestPylspFormatDocument:
+    def test_formats_document(
+        self,
+        config: Config,
+        workspace: Workspace,
+        newline: str,
+        doc_content: str,
+        document: Document,
+    ) -> None:
+        result = plugin.pylsp_format_document(
+            config=config, workspace=workspace, document=document
+        )
 
-    assert result == [
-        {
-            "range": {
-                "start": {"line": 0, "character": 0},
-                "end": {"line": 5, "character": 0},
+        expected_text = dedent(
+            '''\
+            """Simple example for testing.
+
+            Test the docformatter pylsp plugin
+            """
+
+            def main():
+                print("Hello World!")
+            '''
+        ).replace("\n", newline)
+
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 6, "character": 0},
+                },
+                "newText": expected_text,
+            }
+        ]
+
+
+class TestPylspFormatRange:
+    def test_formats_range(
+        self,
+        config: Config,
+        workspace: Workspace,
+        doc_content: str,
+        document: Document,
+    ) -> None:
+        result = plugin.pylsp_format_range(
+            config=config,
+            workspace=workspace,
+            document=document,
+            range={
+                "start": {"line": 0, "character": 2},
+                "end": {"line": 3, "character": 5},
             },
-            "newText": doc_content,
-        }
-    ]
+        )
 
+        expected_text = dedent(
+            '''\
+            """Simple example for testing.
 
-def test_formats_range(
-    config: Config,
-    workspace: Workspace,
-    document: Document,
-    doc_content: str,
-) -> None:
-    result = plugin.pylsp_format_range(
-        config=config,
-        workspace=workspace,
-        document=document,
-        range={
-            "start": {"line": 0, "character": 2},
-            "end": {"line": 1, "character": 5},
-        },
-    )
+            Test the docformatter pylsp plugin
+            """
+            '''
+        )
 
-    assert result == [
-        {
-            "range": {
-                "start": {"line": 0, "character": 0},
-                "end": {"line": 2, "character": 0},
-            },
-            "newText": '"""Simple example for testing."""\n\n',
-        }
-    ]
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 3, "character": 0},
+                },
+                "newText": expected_text,
+            }
+        ]
