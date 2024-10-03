@@ -34,12 +34,27 @@ This plugin adds docstring formatting via [docformatter](https://docformatter.re
 
 ## Developing
 
-Install development dependencies with (you might want to create a virtualenv first):
+Clone the repository:
 
 ``` bash
 git clone https://github.com/heindsight/pylsp-docformatter pylsp-docformatter
+```
+
+Install development dependencies with:
+
+``` bash
 cd pylsp-docformatter
-pip install -e '.[dev]'
+tox devenv
+```
+
+This will create a virtual environment in `venv/` with an editable install of the plugin and all development dependencies.
+
+Alternatively you can create the virtual environment manually:
+
+``` bash
+cd pylsp-docformatter
+python -m venv venv
+pip install -e .[dev]
 ```
 
 ### Enabling logging
