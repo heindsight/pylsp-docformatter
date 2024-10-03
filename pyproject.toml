@@ -9,6 +9,7 @@ authors = [
 ]
 readme = "README.md"
 version = "0.0.1"
+license = {file = "LICENSE"}
 description = "Docformatter plugin for the Python LSP Server."
 keywords = [
     "PEP 257", "pep257", "style", "formatter", "docstrings", "pylsp",
@@ -31,7 +32,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "black",
-    "docformatter",
     "flake8",
     "flake8-pytest-style",
     "isort",
@@ -42,9 +42,6 @@ dev = [
     "pytest-icdiff",
     "pytest-randomly",
 ]
-
-[project.license]
-file = "LICENSE"
 
 [project.urls]
 Homepage = "https://github.com/heindsight/pylsp-docformatter"
