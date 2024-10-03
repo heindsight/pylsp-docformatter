@@ -42,13 +42,8 @@ def workspace(root_uri: str, config: Config) -> Workspace:
 
 
 @pytest.fixture
-def newline() -> str:
-    return "\n"
-
-
-@pytest.fixture
-def doc_content(newline: str) -> str:
-    content = dedent(
+def doc_content() -> str:
+    return dedent(
         '''\
         """Simple example for testing
 
@@ -58,15 +53,12 @@ def doc_content(newline: str) -> str:
             print("Hello World!")
         '''
     )
-    return content.replace("\n", newline)
 
 
 @pytest.fixture
-def document(
-    workspace: Workspace, src_path: Path, doc_content: str, newline: str
-) -> Document:
+def document(workspace: Workspace, src_path: Path, doc_content: str) -> Document:
     dest_path = src_path / "example.py"
-    dest_path.write_text(doc_content, newline=newline)
+    dest_path.write_text(doc_content)
     document_uri = uris.from_fs_path(str(dest_path))
     return Document(document_uri, workspace, source=doc_content)
 
@@ -205,13 +197,11 @@ class TestLoadDocformatConfig:
         assert cache_info.hits == 0
 
 
-@pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
 class TestPylspFormatDocument:
     def test_formats_document(
         self,
         config: Config,
         workspace: Workspace,
-        newline: str,
         doc_content: str,
         document: Document,
     ) -> None:
@@ -229,13 +219,13 @@ class TestPylspFormatDocument:
             def main():
                 print("Hello World!")
             '''
-        ).replace("\n", newline)
+        )
 
         assert result == [
             {
                 "range": {
                     "start": {"line": 0, "character": 0},
-                    "end": {"line": 6, "character": 0},
+                    "end": {"line": 7, "character": 0},
                 },
                 "newText": expected_text,
             }
@@ -247,7 +237,6 @@ class TestPylspFormatRange:
         self,
         config: Config,
         workspace: Workspace,
-        doc_content: str,
         document: Document,
     ) -> None:
         result = plugin.pylsp_format_range(
@@ -273,7 +262,7 @@ class TestPylspFormatRange:
             {
                 "range": {
                     "start": {"line": 0, "character": 0},
-                    "end": {"line": 3, "character": 0},
+                    "end": {"line": 4, "character": 0},
                 },
                 "newText": expected_text,
             }

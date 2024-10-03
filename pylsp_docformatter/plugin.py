@@ -60,23 +60,22 @@ def pylsp_format_range(
 
 
 def _do_format(
-    config: docformatter.Configurater, document: Document, range: Optional[Range] = None
+    config: docformatter.Configurater,
+    document: Document,
+    range_: Optional[Range] = None,
 ) -> List[TextEdit]:
-    if range:
-        text = "".join(document.lines[range["start"]["line"] : range["end"]["line"]])
-    else:
-        range = {
-            "start": {"line": 0, "character": 0},
-            "end": {"line": len(document.lines), "character": 0},
-        }
-        text = document.source
+    if range_:
+        # docformatter uses 1-based line numbers where both start and end are inclusive
+        # LSP uses 0-based line numbers where start is inclusive and end is exclusive,
+        # so we need to adjust the range accordingly
+        config.args.line_range = (range_["start"]["line"] + 1, range_["end"]["line"])
 
     stdout = io.StringIO(newline="")
     stderr = io.StringIO(newline="")
 
     formatter = docformatter.Formatter(
         config.args,
-        stdin=io.StringIO(text, newline=""),
+        stdin=io.StringIO(document.source, newline=""),
         stdout=stdout,
         stderror=stderr,
     )
@@ -85,7 +84,36 @@ def _do_format(
 
     formatted_text = stdout.getvalue()
 
-    return [{"range": range, "newText": formatted_text}]
+    formatted_range = _adjust_range(document, formatted_text, range_)
+    formatted_text = _get_lines(formatted_text, formatted_range)
+
+    return [{"range": formatted_range, "newText": formatted_text}]
+
+
+def _adjust_range(document: Document, text: str, range_: Optional[Range]) -> Range:
+    """Adjust the end of the range to account for changes in the text."""
+    if range_ is None:
+        return Range(
+            start={"line": 0, "character": 0},
+            end={"line": len(text.splitlines()), "character": 0},
+        )
+
+    line_diff = len(text.splitlines()) - len(document.lines)
+
+    return Range(
+        start={"line": range_["start"]["line"], "character": 0},
+        end={
+            "line": range_["end"]["line"] + line_diff,
+            "character": 0,
+        },
+    )
+
+
+def _get_lines(text: str, range_: Range) -> str:
+    """Get the lines in the specified range."""
+    lines = text.splitlines(True)
+
+    return "".join(lines[range_["start"]["line"] : range_["end"]["line"]])
 
 
 def load_docformat_config(
