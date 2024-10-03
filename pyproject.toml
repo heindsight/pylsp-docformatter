@@ -37,7 +37,6 @@ dev = [
     "isort",
     "mypy",
     "pdbpp",
-    "pydocstyle",
     "pytest",
     "pytest-cov",
     "pytest-icdiff",
