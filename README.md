@@ -19,13 +19,18 @@ Then run `python-lsp-server` as usual, the plugin will be auto-discovered by
 
 ## Configuration
 
-... TODO ...
+Configuration is read from the [Python LSP Server configuration](https://github.com/python-lsp/python-lsp-server/#configuration).
+
+The following settings are available:
+
+- `pylsp.plugins.pylsp_docformatter.enabled`: Enable or disable the plugin. Default is `true`.
+- `pylsp.plugins.pylsp_docformatter.config_file`: Path to the configuration file for `docformatter`
+  (`--config` option to `docformatter, see https://docformatter.readthedocs.io/en/latest/configuration.html
+  for details). Unset by default.
 
 ## Features
 
-This plugin adds the following features to `pylsp`:
-
-- ... TODO ...
+This plugin adds docstring formatting via [docformatter](https://docformatter.readthedocs.io) to `pylsp`.
 
 ## Developing
 
@@ -59,11 +64,9 @@ proxy requests to a tcp-mode language server:
 
     nc localhost 7090
 
-TODO: document how to connect to pylsp via pylsp from LSP clients.
 ### Testing 
 
-Run `pytest` to run plugin tests.
-
+Run `tox` to run plugin tests.
 
 
 ## Credits
