@@ -4,10 +4,10 @@ import io
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Generator, List, Optional
 
 import docformatter
-from pylsp import hookimpl
+from pylsp import hookimpl, text_edit
 from pylsp.config.config import Config
 from pylsp.workspace import Document, Workspace
 
@@ -32,20 +32,35 @@ def pylsp_settings() -> LspSettings:
     }
 
 
-@hookimpl(trylast=True)
+@hookimpl(wrapper=True)
 def pylsp_format_document(
     config: Config, workspace: Workspace, document: Document
-) -> List[TextEdit]:
+) -> Generator[None, List[TextEdit], List[TextEdit]]:
     """Format an entire document."""
     logger.debug("Formatting document %s", document.path)
     docformat_config = load_docformat_config(workspace, config, document)
-    return _do_format(docformat_config, document)
+
+    edits = yield
+
+    if edits:
+        text = text_edit.apply_text_edits(document, edits)
+    else:
+        text = document.source
+
+    range_ = Range(
+        start={"line": 0, "character": 0},
+        end={"line": len(document.lines), "character": 0},
+    )
+
+    formatted_text = _do_format(docformat_config, text)
+
+    return [{"range": range_, "newText": formatted_text}]
 
 
-@hookimpl(trylast=True)
+@hookimpl(wrapper=True)
 def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
-) -> List[TextEdit]:
+) -> Generator[None, List[TextEdit], List[TextEdit]]:
     """Format a range of lines."""
     logger.debug(
         "Formatting document %s, lines %s to %s",
@@ -55,16 +70,29 @@ def pylsp_format_range(
     )
 
     docformat_config = load_docformat_config(workspace, config, document)
-    range["start"]["character"] = 0
-    range["end"]["character"] = 0
-    return _do_format(docformat_config, document, range)
+
+    edits = yield
+
+    if edits:
+        text = text_edit.apply_text_edits(document, edits)
+        range_ = _adjust_range(document, text, range)
+    else:
+        text = document.source
+        range_ = Range(
+            start={"line": range["start"]["line"], "character": 0},
+            end={"line": range["end"]["line"], "character": 0},
+        )
+
+    formatted_text = _do_format(docformat_config, text, range_)
+    formatted_range = _adjust_range(document, formatted_text, range_)
+    formatted_range_text = _get_lines(formatted_text, formatted_range)
+
+    return [{"range": formatted_range, "newText": formatted_range_text}]
 
 
 def _do_format(
-    config: docformatter.Configurater,
-    document: Document,
-    range_: Optional[Range] = None,
-) -> List[TextEdit]:
+    config: docformatter.Configurater, text: str, range_: Optional[Range] = None
+) -> str:
     if range_:
         # docformatter uses 1-based line numbers where both start and end are inclusive
         # LSP uses 0-based line numbers where start is inclusive and end is exclusive,
@@ -76,29 +104,23 @@ def _do_format(
 
     formatter = docformatter.Formatter(
         config.args,
-        stdin=io.StringIO(document.source, newline=""),
+        stdin=io.StringIO(text, newline=""),
         stdout=stdout,
         stderror=stderr,
     )
 
     formatter.do_format_standard_in(config.parser)
 
-    formatted_text = stdout.getvalue()
-
-    formatted_range = _adjust_range(document, formatted_text, range_)
-    formatted_text = _get_lines(formatted_text, formatted_range)
-
-    return [{"range": formatted_range, "newText": formatted_text}]
+    return stdout.getvalue()
 
 
-def _adjust_range(document: Document, text: str, range_: Optional[Range]) -> Range:
-    """Adjust the end of the range to account for changes in the text."""
-    if range_ is None:
-        return Range(
-            start={"line": 0, "character": 0},
-            end={"line": len(text.splitlines()), "character": 0},
-        )
+def _adjust_range(document: Document, text: str, range_: Range) -> Range:
+    """Adjust the end of the range to account for changes in the text.
 
+    We assume that no changes occured outside the given range in the original text.
+    Thus, the start remains the same. If the number of lines in the text has changed, we
+    need to adjust the size of the range accordingly.
+    """
     line_diff = len(text.splitlines()) - len(document.lines)
 
     return Range(

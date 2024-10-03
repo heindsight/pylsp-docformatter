@@ -1,13 +1,15 @@
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import Mock
+from typing import List, Optional
+from unittest.mock import Mock, call
 
 import pytest
-from pylsp import uris
+from pylsp import hookimpl, uris
 from pylsp.config.config import Config
 from pylsp.workspace import Document, Workspace
 
 from pylsp_docformatter import plugin
+from pylsp_docformatter.types import TextEdit
 
 
 @pytest.fixture
@@ -47,10 +49,26 @@ def doc_content() -> str:
         '''\
         """Simple example for testing
 
+
         Test the docformatter pylsp plugin"""
 
         def main():
-            print("Hello World!")
+            print('Hello World!')
+        '''
+    )
+
+
+@pytest.fixture
+def reformatted_doc_content() -> str:
+    return dedent(
+        '''\
+        """Simple example for testing.
+
+        Test the docformatter pylsp plugin
+        """
+
+        def main():
+            print('Hello World!')
         '''
     )
 
@@ -197,30 +215,88 @@ class TestLoadDocformatConfig:
         assert cache_info.hits == 0
 
 
+class OtherPlugin:
+    def __init__(self) -> None:
+        self.mock = Mock()
+
+    @hookimpl
+    def pylsp_format_document(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        options: dict,
+    ) -> Optional[List[TextEdit]]:
+        return self.mock(
+            config=config, workspace=workspace, document=document, options=options
+        )
+
+    @hookimpl
+    def pylsp_format_range(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        range: TextEdit,
+        options: dict,
+    ) -> Optional[List[TextEdit]]:
+        return self.mock(
+            config=config, workspace=workspace, document=document, options=options
+        )
+
+
 class TestPylspFormatDocument:
-    def test_formats_document(
+    def test_formats_document_as_only_formatter(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        reformatted_doc_content: str,
+    ) -> None:
+        result = config.plugin_manager.hook.pylsp_format_document(
+            config=config, workspace=workspace, document=document, options={}
+        )
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 7, "character": 0},
+                },
+                "newText": reformatted_doc_content,
+            }
+        ]
+
+    def test_formats_document_formatted_by_other_formatter(
         self,
         config: Config,
         workspace: Workspace,
         doc_content: str,
         document: Document,
+        reformatted_doc_content: str,
     ) -> None:
-        result = plugin.pylsp_format_document(
-            config=config, workspace=workspace, document=document
+        other_plugin = OtherPlugin()
+        config.plugin_manager.register(other_plugin)
+        other_plugin.mock.return_value = [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 7, "character": 0},
+                },
+                "newText": doc_content.replace("'", '"'),
+            }
+        ]
+        expected_text = reformatted_doc_content.replace("'", '"')
+
+        result = config.plugin_manager.hook.pylsp_format_document(
+            config=config,
+            workspace=workspace,
+            document=document,
+            options={},
         )
 
-        expected_text = dedent(
-            '''\
-            """Simple example for testing.
-
-            Test the docformatter pylsp plugin
-            """
-
-            def main():
-                print("Hello World!")
-            '''
-        )
-
+        assert other_plugin.mock.call_args_list == [
+            call(config=config, workspace=workspace, document=document, options={})
+        ]
         assert result == [
             {
                 "range": {
@@ -231,31 +307,60 @@ class TestPylspFormatDocument:
             }
         ]
 
-
-class TestPylspFormatRange:
-    def test_formats_range(
+    def test_formats_document_unchanged_by_other_formatter(
         self,
         config: Config,
         workspace: Workspace,
         document: Document,
+        reformatted_doc_content: str,
     ) -> None:
-        result = plugin.pylsp_format_range(
+        other_plugin = OtherPlugin()
+        config.plugin_manager.register(other_plugin)
+        other_plugin.mock.return_value = None
+
+        result = config.plugin_manager.hook.pylsp_format_document(
             config=config,
             workspace=workspace,
             document=document,
-            range={
-                "start": {"line": 0, "character": 2},
-                "end": {"line": 3, "character": 5},
-            },
+            options={},
         )
 
-        expected_text = dedent(
-            '''\
-            """Simple example for testing.
+        assert other_plugin.mock.call_args_list == [
+            call(config=config, workspace=workspace, document=document, options={})
+        ]
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 7, "character": 0},
+                },
+                "newText": reformatted_doc_content,
+            }
+        ]
 
-            Test the docformatter pylsp plugin
-            """
-            '''
+
+class TestPylspFormatRange:
+    @pytest.fixture
+    def reformatted_doc_content(self, reformatted_doc_content: str) -> str:
+        lines = reformatted_doc_content.splitlines(True)
+        return "".join(lines[:4])
+
+    def test_formats_range_as_only_formatter(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        reformatted_doc_content: str,
+    ) -> None:
+        result = config.plugin_manager.hook.pylsp_format_range(
+            config=config,
+            workspace=workspace,
+            document=document,
+            options={},
+            range={
+                "start": {"line": 0, "character": 2},
+                "end": {"line": 4, "character": 5},
+            },
         )
 
         assert result == [
@@ -264,6 +369,87 @@ class TestPylspFormatRange:
                     "start": {"line": 0, "character": 0},
                     "end": {"line": 4, "character": 0},
                 },
+                "newText": reformatted_doc_content,
+            }
+        ]
+
+    def test_formats_range_formatted_by_other_formatter(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        reformatted_doc_content: str,
+    ) -> None:
+        other_plugin = OtherPlugin()
+        config.plugin_manager.register(other_plugin)
+        range_ = {
+            "start": {"line": 0, "character": 2},
+            "end": {"line": 4, "character": 1},
+        }
+        range_offsets = (
+            document.offset_at_position(range_["start"]),
+            document.offset_at_position(range_["end"]),
+        )
+        range_text = document.source[range_offsets[0] : range_offsets[1]]
+        other_reformatted = range_text.replace("pylsp", "Python LSP")
+
+        other_plugin.mock.return_value = [
+            {"range": range_, "newText": other_reformatted},
+        ]
+        expected_text = reformatted_doc_content.replace("pylsp", "Python LSP")
+
+        result = config.plugin_manager.hook.pylsp_format_range(
+            config=config,
+            workspace=workspace,
+            document=document,
+            options={},
+            range=range_,
+        )
+
+        assert other_plugin.mock.call_args_list == [
+            call(config=config, workspace=workspace, document=document, options={})
+        ]
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 4, "character": 0},
+                },
                 "newText": expected_text,
+            }
+        ]
+
+    def test_formats_range_unchanged_by_other_formatter(
+        self,
+        config: Config,
+        workspace: Workspace,
+        document: Document,
+        reformatted_doc_content: str,
+    ) -> None:
+        other_plugin = OtherPlugin()
+        config.plugin_manager.register(other_plugin)
+        other_plugin.mock.return_value = None
+
+        result = config.plugin_manager.hook.pylsp_format_range(
+            config=config,
+            workspace=workspace,
+            document=document,
+            options={},
+            range={
+                "start": {"line": 0, "character": 2},
+                "end": {"line": 4, "character": 5},
+            },
+        )
+
+        assert other_plugin.mock.call_args_list == [
+            call(config=config, workspace=workspace, document=document, options={})
+        ]
+        assert result == [
+            {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 4, "character": 0},
+                },
+                "newText": reformatted_doc_content,
             }
         ]
