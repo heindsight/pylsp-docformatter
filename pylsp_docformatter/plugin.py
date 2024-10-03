@@ -1,4 +1,5 @@
 """PyLSP plugin to format docstrings using docformatter."""
+
 import io
 import logging
 from functools import lru_cache
