@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 @hookimpl
 def pylsp_settings() -> LspSettings:
     """Get default plugin settings."""
-    logger.info("Initializing pylsp_docformatter")
+    logger.info("Initializing pylsp_docformatter config")
 
     return {
         "plugins": {
@@ -36,6 +36,7 @@ def pylsp_format_document(
     config: Config, workspace: Workspace, document: Document
 ) -> List[TextEdit]:
     """Format an entire document."""
+    logger.debug("Formatting document %s", document.path)
     docformat_config = load_docformat_config(workspace, config, document)
     return _do_format(docformat_config, document)
 
@@ -45,6 +46,13 @@ def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
 ) -> List[TextEdit]:
     """Format a range of lines."""
+    logger.debug(
+        "Formatting document %s, lines %s to %s",
+        document.path,
+        range["start"]["line"],
+        range["end"]["line"],
+    )
+
     docformat_config = load_docformat_config(workspace, config, document)
     range["start"]["character"] = 0
     range["end"]["character"] = 0
@@ -89,6 +97,12 @@ def load_docformat_config(
     )
     config_file = plugin_settings.get("config_file")
 
+    logger.info(
+        "Loading docformatter config for workspace %s (config file %s)",
+        workspace.root_path,
+        config_file,
+    )
+
     return _load_docformat_config(workspace.root_path, config_file)
 
 
@@ -107,5 +121,7 @@ def _load_docformat_config(
     with temp_work_dir(workspace_root):
         configurater = docformatter.Configurater(args)
         configurater.do_parse_arguments()
+
+    logger.info("Loaded docformatter config: %s", vars(configurater.args))
 
     return configurater
