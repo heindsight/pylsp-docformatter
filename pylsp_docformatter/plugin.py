@@ -10,7 +10,7 @@ from pylsp import hookimpl
 from pylsp.config.config import Config
 from pylsp.workspace import Document, Workspace
 
-from .types import FormatResult, LspSettings, Range
+from .types import LspSettings, Range, TextEdit
 from .util import temp_work_dir
 
 
@@ -34,7 +34,7 @@ def pylsp_settings() -> LspSettings:
 @hookimpl(trylast=True)
 def pylsp_format_document(
     config: Config, workspace: Workspace, document: Document
-) -> List[FormatResult]:
+) -> List[TextEdit]:
     """Format an entire document."""
     docformat_config = load_docformat_config(workspace, config, document)
     return _do_format(docformat_config, document)
@@ -43,7 +43,7 @@ def pylsp_format_document(
 @hookimpl(trylast=True)
 def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
-) -> List[FormatResult]:
+) -> List[TextEdit]:
     """Format a range of lines."""
     docformat_config = load_docformat_config(workspace, config, document)
     range["start"]["character"] = 0
@@ -53,7 +53,7 @@ def pylsp_format_range(
 
 def _do_format(
     config: docformatter.Configurater, document: Document, range: Optional[Range] = None
-) -> List[FormatResult]:
+) -> List[TextEdit]:
     if range:
         text = "".join(document.lines[range["start"]["line"] : range["end"]["line"]])
     else:

@@ -1,9 +1,10 @@
 """LSP type definitions."""
+
 from typing import Any, Dict, TypedDict
 
 
-class RangeBoundary(TypedDict):
-    """A boundary of an LSP text range."""
+class Position(TypedDict):
+    """A position in a document."""
 
     line: int
     character: int
@@ -12,11 +13,11 @@ class RangeBoundary(TypedDict):
 class Range(TypedDict):
     """An LSP text range."""
 
-    start: RangeBoundary
-    end: RangeBoundary
+    start: Position
+    end: Position
 
 
-class FormatResult(TypedDict):
+class TextEdit(TypedDict):
     """The result of a formatting operation."""
 
     range: Range
