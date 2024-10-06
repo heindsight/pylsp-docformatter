@@ -1,6 +1,6 @@
 # pylsp-docformatter
 
-Docformatter plugin for the Python LSP Server.
+[Docformatter](https://docformatter.readthedocs.io) plugin for the Python LSP Server.
 
 This is a plugin for [Python LSP Server](https://github.com/python-lsp/python-lsp-server).
 
@@ -30,7 +30,7 @@ The following settings are available:
 
 ## Features
 
-This plugin adds docstring formatting via [docformatter](https://docformatter.readthedocs.io) to `pylsp`.
+This plugin adds docstring formatting via `docformatter` to `pylsp`.
 
 ## Developing
 
@@ -47,7 +47,8 @@ cd pylsp-docformatter
 tox devenv
 ```
 
-This will create a virtual environment in `venv/` with an editable install of the plugin and all development dependencies.
+This will create a virtual environment in `venv/` with an editable install of the plugin and all
+development dependencies (see the [tox documentation](https://tox.wiki) for mor information).
 
 Alternatively you can create the virtual environment manually:
 
