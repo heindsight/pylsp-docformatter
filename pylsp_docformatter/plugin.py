@@ -1,5 +1,6 @@
 """PyLSP plugin to format docstrings using docformatter."""
 
+import difflib
 import io
 import logging
 from functools import lru_cache
@@ -60,7 +61,7 @@ def pylsp_format_document(
 @hookimpl(wrapper=True)
 def pylsp_format_range(
     config: Config, workspace: Workspace, document: Document, range: Range
-) -> Generator[None, List[TextEdit], List[TextEdit]]:
+) -> Generator[None, List[TextEdit], Optional[List[TextEdit]]]:
     """Format a range of lines."""
     logger.debug(
         "Formatting document %s, lines %s to %s",
@@ -75,19 +76,22 @@ def pylsp_format_range(
 
     if edits:
         text = text_edit.apply_text_edits(document, edits)
-        range_ = _adjust_range(document, text, range)
+        range = _adjust_range(range, edits)
+
     else:
         text = document.source
-        range_ = Range(
-            start={"line": range["start"]["line"], "character": 0},
-            end={"line": range["end"]["line"], "character": 0},
-        )
 
-    formatted_text = _do_format(docformat_config, text, range_)
-    formatted_range = _adjust_range(document, formatted_text, range_)
-    formatted_range_text = _get_lines(formatted_text, formatted_range)
+        range["start"]["character"] = 0
 
-    return [{"range": formatted_range, "newText": formatted_range_text}]
+        if range["end"]["character"] != 0:
+            # If the end character is not at the start of the line
+            # we need to include the next line
+            range["end"]["line"] += 1
+            range["end"]["character"] = 0
+
+    formatted_text = _do_format(docformat_config, text, range)
+
+    return _get_changes(document, formatted_text)
 
 
 def _do_format(
@@ -114,29 +118,62 @@ def _do_format(
     return stdout.getvalue()
 
 
-def _adjust_range(document: Document, text: str, range_: Range) -> Range:
-    """Adjust the end of the range to account for changes in the text.
+def _get_changes(document: Document, text: str) -> Optional[List[TextEdit]]:
+    """Get the changes required to transform the document into the specified text."""
+    if document.source == text:
+        return None
 
-    We assume that no changes occured outside the given range in the original text.
-    Thus, the start remains the same. If the number of lines in the text has changed, we
-    need to adjust the size of the range accordingly.
-    """
-    line_diff = len(text.splitlines()) - len(document.lines)
+    new_lines = text.splitlines(True)
+    matcher = difflib.SequenceMatcher(None, document.lines, new_lines)
+
+    old_start = -1
+    old_end = -1
+
+    edited_start = -1
+    edited_end = -1
+
+    for tag, orig_start, orig_end, new_start, new_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+
+        if old_start == -1:
+            old_start = orig_start
+            edited_start = new_start
+
+        old_end = orig_end
+        edited_end = new_end
+
+    text = "".join(new_lines[edited_start:edited_end])
+
+    return [
+        {
+            "newText": text,
+            "range": Range(
+                start={"line": old_start, "character": 0},
+                end={"line": old_end, "character": 0},
+            ),
+        }
+    ]
+
+
+def _adjust_range(range_: Range, edits: List[TextEdit]) -> Range:
+    start = range_["start"].copy()
+    lines = range_["end"]["line"] - range_["start"]["line"]
+
+    for edit in edits:
+        if edit["range"]["start"]["line"] < start["line"]:
+            start["line"] = edit["range"]["start"]["line"]
+
+        diff = (edit["range"]["end"]["line"] - edit["range"]["start"]["line"]) - len(
+            edit["newText"].splitlines()
+        )
+
+        lines += diff
 
     return Range(
-        start={"line": range_["start"]["line"], "character": 0},
-        end={
-            "line": range_["end"]["line"] + line_diff,
-            "character": 0,
-        },
+        start=start,
+        end={"line": start["line"] + lines, "character": 0},
     )
-
-
-def _get_lines(text: str, range_: Range) -> str:
-    """Get the lines in the specified range."""
-    lines = text.splitlines(True)
-
-    return "".join(lines[range_["start"]["line"] : range_["end"]["line"]])
 
 
 def load_docformat_config(

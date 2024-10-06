@@ -4,7 +4,7 @@ from typing import List, Optional
 from unittest.mock import Mock, call
 
 import pytest
-from pylsp import hookimpl, uris
+from pylsp import hookimpl, text_edit, uris
 from pylsp.config.config import Config
 from pylsp.workspace import Document, Workspace
 
@@ -256,15 +256,8 @@ class TestPylspFormatDocument:
         result = config.plugin_manager.hook.pylsp_format_document(
             config=config, workspace=workspace, document=document, options={}
         )
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 7, "character": 0},
-                },
-                "newText": reformatted_doc_content,
-            }
-        ]
+
+        assert text_edit.apply_text_edits(document, result) == reformatted_doc_content
 
     def test_formats_document_formatted_by_other_formatter(
         self,
@@ -297,15 +290,7 @@ class TestPylspFormatDocument:
         assert other_plugin.mock.call_args_list == [
             call(config=config, workspace=workspace, document=document, options={})
         ]
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 7, "character": 0},
-                },
-                "newText": expected_text,
-            }
-        ]
+        assert text_edit.apply_text_edits(document, result) == expected_text
 
     def test_formats_document_unchanged_by_other_formatter(
         self,
@@ -328,23 +313,10 @@ class TestPylspFormatDocument:
         assert other_plugin.mock.call_args_list == [
             call(config=config, workspace=workspace, document=document, options={})
         ]
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 7, "character": 0},
-                },
-                "newText": reformatted_doc_content,
-            }
-        ]
+        assert text_edit.apply_text_edits(document, result) == reformatted_doc_content
 
 
 class TestPylspFormatRange:
-    @pytest.fixture
-    def reformatted_doc_content(self, reformatted_doc_content: str) -> str:
-        lines = reformatted_doc_content.splitlines(True)
-        return "".join(lines[:4])
-
     def test_formats_range_as_only_formatter(
         self,
         config: Config,
@@ -363,15 +335,7 @@ class TestPylspFormatRange:
             },
         )
 
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 4, "character": 0},
-                },
-                "newText": reformatted_doc_content,
-            }
-        ]
+        assert text_edit.apply_text_edits(document, result) == reformatted_doc_content
 
     def test_formats_range_formatted_by_other_formatter(
         self,
@@ -409,15 +373,7 @@ class TestPylspFormatRange:
         assert other_plugin.mock.call_args_list == [
             call(config=config, workspace=workspace, document=document, options={})
         ]
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 4, "character": 0},
-                },
-                "newText": expected_text,
-            }
-        ]
+        assert text_edit.apply_text_edits(document, result) == expected_text
 
     def test_formats_range_unchanged_by_other_formatter(
         self,
@@ -444,12 +400,4 @@ class TestPylspFormatRange:
         assert other_plugin.mock.call_args_list == [
             call(config=config, workspace=workspace, document=document, options={})
         ]
-        assert result == [
-            {
-                "range": {
-                    "start": {"line": 0, "character": 0},
-                    "end": {"line": 4, "character": 0},
-                },
-                "newText": reformatted_doc_content,
-            }
-        ]
+        assert text_edit.apply_text_edits(document, result) == reformatted_doc_content
